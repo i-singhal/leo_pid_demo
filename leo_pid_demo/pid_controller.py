@@ -1,23 +1,42 @@
 """
-PID Waypoint Follower — Gazebo Ground Truth Version
-====================================================
-Uses /world/leo_empty/dynamic_pose/info for ground truth position + yaw.
+PID Waypoint Follower — RViz + rqt Version
+============================================
+Uses Gazebo ground truth for control AND visualization.
+Broadcasts ground truth as tf: world -> base_footprint
+so RViz can display everything correctly.
 
-REQUIRED: run this bridge in a separate terminal BEFORE starting:
+REQUIRED — run in separate terminals:
+
+  # T1: Gazebo
+  ros2 launch leo_gz_bringup leo_gz.launch.py
+
+  # T2: Ground truth bridge
   ros2 run ros_gz_bridge parameter_bridge \
     /world/leo_empty/dynamic_pose/info@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V
+
+  # T3: This node
+  ros2 run leo_pid_demo pid_waypoint_follower
+
+  # T4: RViz (set Fixed Frame to "world")
+  rviz2 -d waypoint_follower.rviz
+
+  # T5 (optional): rqt parameter tuning
+  ros2 run rqt_reconfigure rqt_reconfigure
 """
 
 import math
 import threading
-import subprocess
 
 import rclpy
 from rclpy.node import Node
 from rcl_interfaces.msg import SetParametersResult
-from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Twist
+from nav_msgs.msg import Odometry, Path
+from geometry_msgs.msg import Twist, PoseStamped, Point, TransformStamped
 from tf2_msgs.msg import TFMessage
+from tf2_ros import TransformBroadcaster
+from visualization_msgs.msg import Marker, MarkerArray
+from std_msgs.msg import ColorRGBA
+from builtin_interfaces.msg import Duration
 
 
 # ── Utility functions ────────────────────────────────────────────
@@ -36,16 +55,23 @@ def clamp(value, lower, upper):
     return max(min(value, upper), lower)
 
 
-# ── Node ─────────────────────────────────────────────────────────
+# ── The frame everything is published in ─────────────────────────
+WORLD_FRAME = 'world'
+
 
 class PIDWaypointFollower(Node):
     def __init__(self):
         super().__init__('pid_waypoint_follower')
 
-        # ── ROS interfaces ───────────────────────────────────────
+        # ── cmd_vel publisher ────────────────────────────────────
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
 
-        # Ground truth from Gazebo dynamic_pose
+        # ── tf broadcaster: world -> base_footprint ──────────────
+        # This lets RViz know the robot's true position in the
+        # world frame. No localization needed — it's ground truth.
+        self.tf_broadcaster = TransformBroadcaster(self)
+
+        # ── Ground truth from Gazebo ─────────────────────────────
         self.gt_sub = self.create_subscription(
             TFMessage,
             '/world/leo_empty/dynamic_pose/info',
@@ -53,16 +79,32 @@ class PIDWaypointFollower(Node):
             10
         )
 
-        # Odom — fallback + drift comparison
+        # ── Odom (fallback only) ─────────────────────────────────
         self.odom_sub = self.create_subscription(
             Odometry, '/odom', self.odom_callback, 10
         )
 
+        # ── RViz "2D Nav Goal" click ─────────────────────────────
+        self.goal_sub = self.create_subscription(
+            PoseStamped, '/goal_pose', self.rviz_goal_callback, 10
+        )
+
+        # ── RViz visualization publishers ────────────────────────
+        self.marker_pub = self.create_publisher(
+            MarkerArray, '/waypoint_markers', 10
+        )
+        self.path_pub = self.create_publisher(Path, '/robot_path', 10)
+        self.path_msg = Path()
+        self.path_msg.header.frame_id = WORLD_FRAME
+
+        self.goal_marker_pub = self.create_publisher(
+            Marker, '/goal_marker', 10
+        )
+
+        # ── Timers ───────────────────────────────────────────────
         self.control_hz = 20.0
         self.timer = self.create_timer(1.0 / self.control_hz, self.control_loop)
-
-        # ── Gazebo world name (for marker spawning) ──────────────
-        self.world_name = 'leo_empty'
+        self.viz_timer = self.create_timer(0.2, self.publish_visualization)
 
         # ── Robot state ──────────────────────────────────────────
         self._pose_lock = threading.Lock()
@@ -88,10 +130,9 @@ class PIDWaypointFollower(Node):
         self.path_generated = False
         self.finished = True
         self.phase = 'move'
-
         self.wp_spacing = 0.5
 
-        # ── PID parameters (tuneable at runtime) ─────────────────
+        # ── PID parameters ───────────────────────────────────────
         self.declare_parameter('kp_lin', 0.6)
         self.declare_parameter('ki_lin', 0.0)
         self.declare_parameter('kd_lin', 0.05)
@@ -123,11 +164,10 @@ class PIDWaypointFollower(Node):
         self.prev_heading_error = None
         self.prev_time = None
 
-        # ── Thread safety / markers ──────────────────────────────
+        # ── Thread safety ────────────────────────────────────────
         self.goal_lock = threading.Lock()
-        self.marker_batch_id = 0
 
-        # ── Input thread ─────────────────────────────────────────
+        # ── Terminal input ───────────────────────────────────────
         self.input_thread = threading.Thread(
             target=self.goal_input_loop, daemon=True
         )
@@ -135,11 +175,10 @@ class PIDWaypointFollower(Node):
 
         self.get_logger().info('PID waypoint follower started.')
         self.get_logger().info(
-            'Type a new goal ANY TIME to preempt the current one.'
+            'Set goals: RViz "2D Goal Pose" click  OR  type "x y" here'
         )
         self.get_logger().info(
-            'Waiting for ground truth on '
-            '/world/leo_empty/dynamic_pose/info ...'
+            f'RViz fixed frame: {WORLD_FRAME}'
         )
 
     # ── Parameters ───────────────────────────────────────────────
@@ -169,32 +208,19 @@ class PIDWaypointFollower(Node):
     # ── Sensor callbacks ─────────────────────────────────────────
 
     def ground_truth_callback(self, msg):
-        """Extract robot base pose from dynamic_pose/info.
-
-        The first transform in the TFMessage is the model's world-frame
-        pose.  Remaining transforms are individual links (wheels etc).
-        We identify the robot as the entry closest to ground (z ≈ 0)
-        with the largest horizontal displacement from origin.
-        """
         if not msg.transforms:
             return
 
-        # Pick the first transform with z near ground level
-        # (the model root, not a wheel or rocker link)
         best = None
         best_score = -1.0
         for t in msg.transforms:
             tz = t.transform.translation.z
-            tx = t.transform.translation.x
-            ty = t.transform.translation.y
-            horiz = abs(tx) + abs(ty)
-            # Robot base: z close to 0, large horizontal displacement
+            horiz = abs(t.transform.translation.x) + abs(t.transform.translation.y)
             if abs(tz) < 0.05 and horiz > best_score:
                 best_score = horiz
                 best = t
 
         if best is None:
-            # Fallback: just use index 0
             best = msg.transforms[0]
 
         x = best.transform.translation.x
@@ -206,12 +232,23 @@ class PIDWaypointFollower(Node):
             self._y = y
             self._yaw = yaw
 
+        # ── Broadcast tf: world -> base_footprint ────────────────
+        # This is what makes RViz work — it knows where the robot
+        # is in the world frame, so markers line up with reality.
+        tf_msg = TransformStamped()
+        tf_msg.header.stamp = self.get_clock().now().to_msg()
+        tf_msg.header.frame_id = WORLD_FRAME
+        tf_msg.child_frame_id = 'base_footprint'
+        tf_msg.transform = best.transform
+        self.tf_broadcaster.sendTransform(tf_msg)
+
         if not self.gt_available:
             self.gt_available = True
             self.pose_ready = True
             self.get_logger().info(
-                f'=== GROUND TRUTH ONLINE ===  '
-                f'pos=({x:.3f},{y:.3f})  yaw={math.degrees(yaw):.1f}deg'
+                f'GROUND TRUTH ONLINE  pos=({x:.3f},{y:.3f})  '
+                f'yaw={math.degrees(yaw):.1f}deg  '
+                f'Broadcasting tf: {WORLD_FRAME} -> base_footprint'
             )
 
     def odom_callback(self, msg):
@@ -232,19 +269,23 @@ class PIDWaypointFollower(Node):
             self.odom_ready = True
             if not self.gt_available:
                 self.pose_ready = True
-                self.get_logger().warn(
-                    'Ground truth NOT received yet — using ODOM (will drift!).'
-                )
+                self.get_logger().warn('Using ODOM (ground truth bridge not running).')
 
-    # ── Pose access ──────────────────────────────────────────────
+    # ── RViz click goal ──────────────────────────────────────────
 
-    def _get_pose(self):
-        with self._pose_lock:
-            return self._x, self._y, self._yaw
+    def rviz_goal_callback(self, msg):
+        gx = msg.pose.position.x
+        gy = msg.pose.position.y
 
-    def _get_odom_pose(self):
-        with self._pose_lock:
-            return self._odom_x, self._odom_y, self._odom_yaw
+        with self.goal_lock:
+            was_moving = not self.finished
+            self.pending_goal = (gx, gy)
+            self.new_goal_requested = True
+
+        action = 'Preempting ->' if was_moving else 'New'
+        self.get_logger().info(
+            f'RViz goal: {action} ({gx:.2f}, {gy:.2f})'
+        )
 
     # ── Terminal goal input ──────────────────────────────────────
 
@@ -264,13 +305,143 @@ class PIDWaypointFollower(Node):
                     self.pending_goal = (gx, gy)
                     self.new_goal_requested = True
                 if was_moving:
-                    print(f'Preempting -> new goal: ({gx:.2f}, {gy:.2f})')
+                    print(f'Preempting -> ({gx:.2f}, {gy:.2f})')
                 else:
                     print(f'Queued goal: ({gx:.2f}, {gy:.2f})')
             except ValueError:
                 print('Invalid input.')
             except (EOFError, KeyboardInterrupt):
                 break
+
+    # ── Pose access ──────────────────────────────────────────────
+
+    def _get_pose(self):
+        with self._pose_lock:
+            return self._x, self._y, self._yaw
+
+    # ── RViz visualization ───────────────────────────────────────
+
+    def publish_visualization(self):
+        if not self.pose_ready:
+            return
+
+        now = self.get_clock().now().to_msg()
+        cx, cy, cyaw = self._get_pose()
+
+        # ── Robot path trail ─────────────────────────────────────
+        pose = PoseStamped()
+        pose.header.stamp = now
+        pose.header.frame_id = WORLD_FRAME
+        pose.pose.position.x = cx
+        pose.pose.position.y = cy
+        pose.pose.position.z = 0.0
+        pose.pose.orientation.z = math.sin(cyaw / 2.0)
+        pose.pose.orientation.w = math.cos(cyaw / 2.0)
+
+        self.path_msg.header.stamp = now
+        self.path_msg.poses.append(pose)
+        if len(self.path_msg.poses) > 2000:
+            self.path_msg.poses = self.path_msg.poses[-2000:]
+        self.path_pub.publish(self.path_msg)
+
+        # ── Waypoint markers ─────────────────────────────────────
+        marker_array = MarkerArray()
+
+        if self.waypoints and not self.finished:
+            for i, (wx, wy) in enumerate(self.waypoints):
+                is_final = (i == len(self.waypoints) - 1)
+                is_reached = (i < self.current_wp_idx)
+                is_current = (i == self.current_wp_idx)
+
+                m = Marker()
+                m.header.frame_id = WORLD_FRAME
+                m.header.stamp = now
+                m.ns = 'waypoints'
+                m.id = i
+                m.type = Marker.SPHERE
+                m.action = Marker.ADD
+                m.pose.position.x = wx
+                m.pose.position.y = wy
+                m.pose.position.z = 0.05
+
+                if is_final:
+                    m.scale.x = m.scale.y = m.scale.z = 0.80
+                else:
+                    m.scale.x = m.scale.y = m.scale.z = 0.50
+
+                if is_reached:
+                    m.color = ColorRGBA(r=0.5, g=0.5, b=0.5, a=0.4)
+                elif is_current:
+                    m.color = ColorRGBA(r=1.0, g=1.0, b=0.0, a=1.0)
+                elif is_final:
+                    m.color = ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0)
+                else:
+                    m.color = ColorRGBA(r=0.2, g=0.4, b=1.0, a=0.8)
+
+                m.lifetime = Duration(sec=0, nanosec=0)
+                marker_array.markers.append(m)
+
+            # Line connecting waypoints
+            line = Marker()
+            line.header.frame_id = WORLD_FRAME
+            line.header.stamp = now
+            line.ns = 'waypoint_line'
+            line.id = 0
+            line.type = Marker.LINE_STRIP
+            line.action = Marker.ADD
+            line.scale.x = 0.08
+            line.color = ColorRGBA(r=0.2, g=0.6, b=1.0, a=0.5)
+            line.lifetime = Duration(sec=0, nanosec=0)
+
+            for wx, wy in self.waypoints:
+                p = Point()
+                p.x = wx
+                p.y = wy
+                p.z = 0.02
+                line.points.append(p)
+            marker_array.markers.append(line)
+
+        else:
+            clear = Marker()
+            clear.header.frame_id = WORLD_FRAME
+            clear.header.stamp = now
+            clear.ns = 'waypoints'
+            clear.action = Marker.DELETEALL
+            marker_array.markers.append(clear)
+
+            clear_line = Marker()
+            clear_line.header.frame_id = WORLD_FRAME
+            clear_line.header.stamp = now
+            clear_line.ns = 'waypoint_line'
+            clear_line.action = Marker.DELETEALL
+            marker_array.markers.append(clear_line)
+
+        self.marker_pub.publish(marker_array)
+
+        # ── Goal arrow ───────────────────────────────────────────
+        goal_m = Marker()
+        goal_m.header.frame_id = WORLD_FRAME
+        goal_m.header.stamp = now
+        goal_m.ns = 'goal'
+        goal_m.id = 0
+        goal_m.type = Marker.ARROW
+        goal_m.lifetime = Duration(sec=0, nanosec=0)
+
+        if self.goal_x is not None and not self.finished:
+            goal_m.action = Marker.ADD
+            goal_m.pose.position.x = self.goal_x
+            goal_m.pose.position.y = self.goal_y
+            goal_m.pose.position.z = 0.15
+            goal_m.pose.orientation.y = 0.707
+            goal_m.pose.orientation.w = 0.707
+            goal_m.scale.x = 0.3
+            goal_m.scale.y = 0.08
+            goal_m.scale.z = 0.08
+            goal_m.color = ColorRGBA(r=0.0, g=1.0, b=0.0, a=0.9)
+        else:
+            goal_m.action = Marker.DELETE
+
+        self.goal_marker_pub.publish(goal_m)
 
     # ── Waypoints ────────────────────────────────────────────────
 
@@ -293,45 +464,6 @@ class PIDWaypointFollower(Node):
         self.get_logger().info(
             f'Generated {len(self.waypoints)} waypoints ({total_dist:.2f}m)'
         )
-
-    # ── Gazebo markers ───────────────────────────────────────────
-
-    def spawn_marker(self, name, x, y, z, radius, r, g, b):
-        sdf = (
-            f'<?xml version="1.0" ?><sdf version="1.7">'
-            f'<model name="{name}"><static>true</static>'
-            f'<pose>{x} {y} {z} 0 0 0</pose>'
-            f'<link name="link"><visual name="visual">'
-            f'<geometry><sphere><radius>{radius}</radius></sphere></geometry>'
-            f'<material><ambient>{r} {g} {b} 1</ambient>'
-            f'<diffuse>{r} {g} {b} 1</diffuse>'
-            f'</material></visual></link></model></sdf>'
-        )
-        service = f'/world/{self.world_name}/create'
-        req_sdf = sdf.replace('"', '\\"')
-        try:
-            subprocess.run([
-                'gz', 'service', '-s', service,
-                '--reqtype', 'gz.msgs.EntityFactory',
-                '--reptype', 'gz.msgs.Boolean',
-                '--timeout', '1000',
-                '--req', f'sdf: "{req_sdf}"',
-            ], capture_output=True, text=True, check=False)
-        except Exception:
-            pass
-
-    def spawn_waypoint_markers(self):
-        self.marker_batch_id += 1
-        b = self.marker_batch_id
-        for i, (wx, wy) in enumerate(self.waypoints):
-            final = (i == len(self.waypoints) - 1)
-            name = f'goal_{b}_final' if final else f'goal_{b}_wp_{i}'
-            self.spawn_marker(
-                name, wx, wy,
-                0.08 if final else 0.06,
-                0.08 if final else 0.05,
-                1 if final else 0, 0, 1 if not final else 0
-            )
 
     # ── Helpers ──────────────────────────────────────────────────
 
@@ -375,13 +507,11 @@ class PIDWaypointFollower(Node):
                 sx, sy, syaw = self._get_pose()
                 gdir = math.atan2(self.goal_y - sy, self.goal_x - sx)
                 self.get_logger().info(
-                    f'=== NEW GOAL ({self.goal_x:.2f},{self.goal_y:.2f}) ===  '
+                    f'NEW GOAL ({self.goal_x:.2f},{self.goal_y:.2f})  '
                     f'from ({sx:.2f},{sy:.2f}) yaw={math.degrees(syaw):.1f}  '
-                    f'err={math.degrees(wrap_to_pi(gdir-syaw)):.1f}deg  '
-                    f'src={"GT" if self.gt_available else "ODOM"}'
+                    f'err={math.degrees(wrap_to_pi(gdir-syaw)):.1f}deg'
                 )
                 self.generate_waypoints()
-                self.spawn_waypoint_markers()
 
         if self.finished or not self.path_generated:
             return
@@ -505,20 +635,6 @@ class PIDWaypointFollower(Node):
         cmd.linear.x = lin_cmd
         cmd.angular.z = ang_cmd
         self.cmd_pub.publish(cmd)
-
-        # Logging with drift comparison
-        ox, oy, oy_yaw = self._get_odom_pose()
-        pd = math.hypot(cx - ox, cy - oy)
-        yd = math.degrees(wrap_to_pi(cyaw - oy_yaw))
-
-        '''self.get_logger().info(
-            f'MOVE wp={self.current_wp_idx}{"(F)" if is_final else ""}  '
-            f'pos=({cx:.2f},{cy:.2f}) yaw={math.degrees(cyaw):.1f}  '
-            f'err={math.degrees(heading_error):.1f}  '
-            f'd={dist_error:.3f}  '
-            f'v={lin_cmd:.3f} w={ang_cmd:.3f}  '
-            f'drift:pos={pd:.2f}m yaw={yd:.1f}deg'
-        )'''
 
 
 def main(args=None):

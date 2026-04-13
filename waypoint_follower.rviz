@@ -1,0 +1,67 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Plane Cell Count: 20
+      Cell Size: 1
+      Color: 160; 160; 160
+      Enabled: true
+
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: true
+      Show Names: true
+      Show Axes: true
+      Show Arrows: false
+      Update Interval: 0.1
+
+    - Class: rviz_default_plugins/RobotModel
+      Name: RobotModel
+      Robot Description: robot_description
+      Enabled: true
+
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Waypoints
+      Marker Topic:
+        Value: /waypoint_markers
+        Depth: 5
+        Reliability Policy: Reliable
+      Enabled: true
+
+    - Class: rviz_default_plugins/Marker
+      Name: Goal Arrow
+      Marker Topic:
+        Value: /goal_marker
+        Depth: 5
+        Reliability Policy: Reliable
+      Enabled: true
+
+    - Class: rviz_default_plugins/Path
+      Name: Robot Path
+      Topic:
+        Value: /robot_path
+        Depth: 5
+        Reliability Policy: Reliable
+      Color: 0; 255; 0
+      Line Style: Lines
+      Width: 0.03
+      Enabled: true
+
+  Global Options:
+    Fixed Frame: world
+    Frame Rate: 30
+
+  Views:
+    Current:
+      Class: rviz_default_plugins/TopDownOrtho
+      Name: TopDown
+      X: 0
+      Y: 0
+      Scale: 50
+      Angle: 0
+      Near Clip Distance: 0.01
