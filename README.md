@@ -69,8 +69,8 @@ This starts Gazebo, the ground truth bridge, the PID waypoint follower (in its o
 
 Two ways to set goals:
 
-- **Type coordinates** in the xterm window: `2.0 1.0`
-- **Click in RViz** using the "2D Goal Pose" button (the green arrow in the toolbar)
+- **Type coordinates** in the xterm window: `2.00 1.00`
+- **Click in RViz** 
 
 ### Launch with a custom world
 
