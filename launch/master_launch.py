@@ -71,7 +71,7 @@ def generate_launch_description():
             PythonLaunchDescriptionSource(
                 os.path.join(leo_gz_bringup, 'launch', 'leo_gz.launch.py')
             ),
-            launch_arguments={'world': world_path}.items(),
+            launch_arguments={'sim_world': world_path}.items(),
         )
 
         # ── 2. Ground Truth Bridge (5s delay) ────────────────────
@@ -93,6 +93,36 @@ def generate_launch_description():
                 )
             ],
         )
+
+        # ── 2b. LiDAR Bridge (5s delay, only for obstacle world) ─
+        # Bridges the overhead LiDAR point cloud from Gazebo to ROS 2.
+        # Only needed when the obstacle world is loaded.
+        lidar_bridge = None
+        if chosen_world != 'empty':
+            lidar_bridge = TimerAction(
+                period=5.0,
+                actions=[
+                    ExecuteProcess(
+                        cmd=[
+                            'ros2', 'run', 'ros_gz_bridge',
+                            'parameter_bridge',
+                            '/overhead_lidar/points@'
+                            'sensor_msgs/msg/PointCloud2[gz.msgs.PointCloudPacked',
+                        ],
+                        output='screen',
+                    ),
+                    ExecuteProcess(
+                        cmd=[
+                            'ros2', 'run', 'tf2_ros', 'static_transform_publisher',
+                            '--x', '0', '--y', '0', '--z', '12',
+                            '--roll', '0', '--pitch', '1.5708', '--yaw', '0',
+                            '--frame-id', 'world',
+                            '--child-frame-id', 'overhead_lidar/link/overhead_lidar_sensor',
+                        ],
+                        output='screen',
+                    ),
+                ],
+            )
 
         # ── 3. PID Waypoint Follower (7s delay, own terminal) ────
         pid_node = TimerAction(
@@ -123,12 +153,15 @@ def generate_launch_description():
             ],
         )
 
-        return [
+        actions = [
             gazebo_launch,
             ground_truth_bridge,
             pid_node,
             rviz,
         ]
+        if lidar_bridge is not None:
+            actions.append(lidar_bridge)
+        return actions
 
     # ── Assemble ─────────────────────────────────────────────────
     # world_arg is declared first so the launch system knows

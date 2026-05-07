@@ -33,6 +33,11 @@ setup(
         ('share/' + package_name,
             glob('*.rviz')),
 
+        # ── World files ─────────────────────────────────────────
+        # Custom Gazebo world files (obstacle world, etc.)
+        ('share/' + package_name + '/worlds',
+            glob('worlds/*.sdf')),
+            
         # ── Scripts ──────────────────────────────────────────────
         # Installs kill_all.sh so it's accessible after building.
         ('share/' + package_name + '/scripts',
@@ -52,6 +57,7 @@ setup(
     entry_points={
         'console_scripts': [
             'pid_waypoint_follower = leo_pid_demo.pid_controller:main',
+            'lidar_cloud = leo_pid_demo.lidar_cloud_node:main',
         ],
     },
 )
