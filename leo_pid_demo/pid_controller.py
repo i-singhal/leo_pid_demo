@@ -1,27 +1,15 @@
 """
-PID Waypoint Follower — RViz + rqt Version
-============================================
+PID Waypoint Follower for Leo Rover
+=====================================
 Uses Gazebo ground truth for control AND visualization.
 Broadcasts ground truth as tf: world -> base_footprint
 so RViz can display everything correctly.
 
-REQUIRED — run in separate terminals:
+Usage:
+  ros2 launch leo_pid_demo master_launch.py
 
-  # T1: Gazebo
-  ros2 launch leo_gz_bringup leo_gz.launch.py
-
-  # T2: Ground truth bridge
-  ros2 run ros_gz_bridge parameter_bridge \
-    /world/leo_empty/dynamic_pose/info@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V
-
-  # T3: This node
-  ros2 run leo_pid_demo pid_waypoint_follower
-
-  # T4: RViz (set Fixed Frame to "world")
-  rviz2 -d waypoint_follower.rviz
-
-  # T5 (optional): rqt parameter tuning
-  ros2 run rqt_reconfigure rqt_reconfigure
+The master launch file starts Gazebo, the ground truth bridge,
+this node (in its own xterm terminal), and RViz automatically.
 """
 
 import math
@@ -71,13 +59,18 @@ class PIDWaypointFollower(Node):
         # world frame. No localization needed — it's ground truth.
         self.tf_broadcaster = TransformBroadcaster(self)
 
-        # ── Ground truth from Gazebo ─────────────────────────────
+       # ── Ground truth from Gazebo ─────────────────────────────
+        self.declare_parameter('gz_world_name', 'leo_empty')
+        gz_world = self.get_parameter('gz_world_name').value
+        gt_topic = f'/world/{gz_world}/dynamic_pose/info'
+
         self.gt_sub = self.create_subscription(
             TFMessage,
-            '/world/leo_empty/dynamic_pose/info',
+            gt_topic,
             self.ground_truth_callback,
             10
         )
+        self.get_logger().info(f'Ground truth topic: {gt_topic}')
 
         # ── Odom (fallback only) ─────────────────────────────────
         self.odom_sub = self.create_subscription(
