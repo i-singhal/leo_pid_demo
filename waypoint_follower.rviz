@@ -1,67 +1,247 @@
 Panels:
   - Class: rviz_common/Displays
+    Help Height: 70
     Name: Displays
+    Property Tree Widget:
+      Expanded:
+        - /Goal Arrow1
+      Splitter Ratio: 0.5
+    Tree Height: 210
   - Class: rviz_common/Views
+    Expanded:
+      - /Current View1
     Name: Views
+    Splitter Ratio: 0.5
 Visualization Manager:
+  Class: ""
   Displays:
-    - Class: rviz_default_plugins/Grid
-      Name: Grid
-      Plane Cell Count: 20
+    - Alpha: 0.5
       Cell Size: 1
+      Class: rviz_default_plugins/Grid
       Color: 160; 160; 160
       Enabled: true
-
+      Line Style:
+        Line Width: 0.029999999329447746
+        Value: Lines
+      Name: Grid
+      Normal Cell Count: 0
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Plane: XY
+      Plane Cell Count: 20
+      Reference Frame: <Fixed Frame>
+      Value: true
     - Class: rviz_default_plugins/TF
+      Enabled: true
+      Filter (blacklist): ""
+      Filter (whitelist): ""
+      Frame Timeout: 15
+      Frames:
+        All Enabled: true
+        antenna_link:
+          Value: true
+        base_footprint:
+          Value: true
+        base_link:
+          Value: true
+        camera_frame:
+          Value: true
+        camera_optical_frame:
+          Value: true
+        imu_frame:
+          Value: true
+        laser_frame:
+          Value: true
+        odom:
+          Value: true
+        rocker_L_link:
+          Value: true
+        rocker_R_link:
+          Value: true
+        wheel_FL_link:
+          Value: true
+        wheel_FR_link:
+          Value: true
+        wheel_RL_link:
+          Value: true
+        wheel_RR_link:
+          Value: true
+        world:
+          Value: true
+      Marker Scale: 1
       Name: TF
-      Enabled: true
-      Show Names: true
-      Show Axes: true
       Show Arrows: false
-      Update Interval: 0.1
-
-    - Class: rviz_default_plugins/RobotModel
+      Show Axes: true
+      Show Names: true
+      Tree:
+        world:
+          base_footprint:
+            base_link:
+              antenna_link:
+                {}
+              camera_frame:
+                camera_optical_frame:
+                  {}
+              imu_frame:
+                {}
+              laser_frame:
+                {}
+      Update Interval: 0.10000000149011612
+      Value: true
+    - Alpha: 1
+      Class: rviz_default_plugins/RobotModel
+      Collision Enabled: false
+      Description File: ""
+      Description Source: Topic
+      Description Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: ""
+      Enabled: true
+      Links:
+        All Links Enabled: true
+        Expand Joint Details: false
+        Expand Link Details: false
+        Expand Tree: false
+        Link Tree Style: ""
+      Mass Properties:
+        Inertia: false
+        Mass: false
       Name: RobotModel
-      Robot Description: robot_description
-      Enabled: true
-
+      TF Prefix: ""
+      Update Interval: 0
+      Value: true
+      Visual Enabled: true
     - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
       Name: Waypoints
-      Marker Topic:
-        Value: /waypoint_markers
-        Depth: 5
-        Reliability Policy: Reliable
-      Enabled: true
-
-    - Class: rviz_default_plugins/Marker
-      Name: Goal Arrow
-      Marker Topic:
-        Value: /goal_marker
-        Depth: 5
-        Reliability Policy: Reliable
-      Enabled: true
-
-    - Class: rviz_default_plugins/Path
-      Name: Robot Path
+      Namespaces:
+        {}
       Topic:
-        Value: /robot_path
         Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
         Reliability Policy: Reliable
-      Color: 0; 255; 0
-      Line Style: Lines
-      Width: 0.03
+        Value: visualization_marker_array
+      Value: true
+    - Class: rviz_default_plugins/Marker
       Enabled: true
-
+      Name: Goal Arrow
+      Namespaces:
+        {}
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: ""
+      Value: true
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz_default_plugins/Path
+      Color: 0; 255; 0
+      Enabled: true
+      Head Diameter: 0.30000001192092896
+      Head Length: 0.20000000298023224
+      Length: 0.30000001192092896
+      Line Style: Lines
+      Line Width: 0.029999999329447746
+      Name: Robot Path
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Pose Color: 255; 85; 255
+      Pose Style: None
+      Radius: 0.029999999329447746
+      Shaft Diameter: 0.10000000149011612
+      Shaft Length: 0.10000000149011612
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /robot_path
+      Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: MarkerArray
+      Namespaces:
+        waypoint_line: true
+        waypoints: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /waypoint_markers
+      Value: true
+  Enabled: true
   Global Options:
+    Background Color: 48; 48; 48
     Fixed Frame: world
     Frame Rate: 30
-
+  Name: root
+  Tools:
+    - Class: rviz_default_plugins/SetGoal
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: goal_pose
+  Transformation:
+    Current:
+      Class: rviz_default_plugins/TF
+  Value: true
   Views:
     Current:
+      Angle: 0
       Class: rviz_default_plugins/TopDownOrtho
-      Name: TopDown
+      Enable Stereo Rendering:
+        Stereo Eye Separation: 0.05999999865889549
+        Stereo Focal Distance: 1
+        Swap Stereo Eyes: false
+        Value: false
+      Invert Z Axis: false
+      Name: Current View
+      Near Clip Distance: 0.009999999776482582
+      Scale: 50
+      Target Frame: <Fixed Frame>
+      Value: TopDownOrtho (rviz_default_plugins)
       X: 0
       Y: 0
-      Scale: 50
-      Angle: 0
-      Near Clip Distance: 0.01
+    Saved:
+      - Angle: 0
+        Class: rviz_default_plugins/TopDownOrtho
+        Enable Stereo Rendering:
+          Stereo Eye Separation: 0.05999999865889549
+          Stereo Focal Distance: 1
+          Swap Stereo Eyes: false
+          Value: false
+        Invert Z Axis: false
+        Name: TopDownOrtho
+        Near Clip Distance: 0.009999999776482582
+        Scale: 50
+        Target Frame: <Fixed Frame>
+        Value: TopDownOrtho (rviz_default_plugins)
+        X: 0
+        Y: 0
+Window Geometry:
+  Displays:
+    collapsed: false
+  Height: 720
+  Hide Left Dock: false
+  Hide Right Dock: false
+  QMainWindow State: 000000ff00000000fd0000000100000000000001c900000272fc0200000002fb000000100044006900730070006c006100790073010000003f00000158000000cc00fffffffb0000000a00560069006500770073010000019d00000114000000a900ffffff000001780000027200000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  Views:
+    collapsed: false
+  Width: 839
+  X: 599
+  Y: 73
