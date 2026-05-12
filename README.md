@@ -156,6 +156,19 @@ bash ~/rover_ws/src/leo_pid_demo/scripts/kill_all.sh
 
 This finds and kills all ROS 2 and Gazebo processes by name, then cleans up DDS shared memory.
 
+You can also set up an alias kill command:
+
+```bash
+killros
+```
+
+This is an alias that runs `scripts/kill_all.sh`, which finds and kills all ROS 2 and Gazebo processes by name, then cleans up DDS shared memory. To set up the alias on a fresh machine:
+
+```bash
+echo "alias killros='bash ~/rover_ws/src/leo_pid_demo/scripts/kill_all.sh'" >> ~/.bashrc
+source ~/.bashrc
+```
+
 ### Tune PID parameters at runtime
 
 ```bash
