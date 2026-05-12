@@ -56,6 +56,8 @@ Visualization Manager:
           Value: true
         odom:
           Value: true
+        overhead_lidar/link/overhead_lidar_sensor:
+          Value: true
         rocker_L_link:
           Value: true
         rocker_R_link:
@@ -88,6 +90,8 @@ Visualization Manager:
                 {}
               laser_frame:
                 {}
+          overhead_lidar/link/overhead_lidar_sensor:
+            {}
       Update Interval: 0.10000000149011612
       Value: true
     - Alpha: 1
@@ -202,7 +206,7 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Angle: 0
+      Angle: -1.5707999467849731
       Class: rviz_default_plugins/TopDownOrtho
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
@@ -233,6 +237,21 @@ Visualization Manager:
         Value: TopDownOrtho (rviz_default_plugins)
         X: 0
         Y: 0
+      - Angle: -1.5707999467849731
+        Class: rviz_default_plugins/TopDownOrtho
+        Enable Stereo Rendering:
+          Stereo Eye Separation: 0.05999999865889549
+          Stereo Focal Distance: 1
+          Swap Stereo Eyes: false
+          Value: false
+        Invert Z Axis: false
+        Name: TopDownOrtho
+        Near Clip Distance: 0.009999999776482582
+        Scale: 50
+        Target Frame: <Fixed Frame>
+        Value: TopDownOrtho (rviz_default_plugins)
+        X: 0
+        Y: 0
 Window Geometry:
   Displays:
     collapsed: false
@@ -243,5 +262,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 839
-  X: 599
-  Y: 73
+  X: 924
+  Y: 57
