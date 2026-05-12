@@ -1,0 +1,42 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Value: true
+    - Class: rviz_default_plugins/PointCloud2
+      Name: PointCloud2
+      Enabled: true
+      Topic:
+        Value: /overhead_lidar/points
+        Depth: 5
+        Reliability Policy: Reliable
+      Size (m): 0.08
+      Style: Flat Squares
+      Color Transformer: AxisColor
+      Axis: Z
+      Use Fixed Frame: true
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: true
+      Value: true
+  Global Options:
+    Fixed Frame: world
+  Tools:
+    - Class: rviz_default_plugins/MoveCamera
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 25
+      Focal Point:
+        X: 0
+        Y: 0
+        Z: 0
+      Name: Current View
+      Pitch: 1.2
+      Yaw: 0.5
+      Value: Orbit (rviz_default_plugins)

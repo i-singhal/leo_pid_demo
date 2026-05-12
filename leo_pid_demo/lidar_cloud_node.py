@@ -9,7 +9,7 @@ class LidarCloudNode(Node):
 
         self.declare_parameter("input_topic", "/overhead_lidar/points")
         self.declare_parameter("output_topic", "/lidar/points_fixed")
-        self.declare_parameter("frame_id", "base_footprint")
+        self.declare_parameter("frame_id", "overhead_lidar/link/overhead_lidar_sensor")
 
         self.input_topic = self.get_parameter("input_topic").value
         self.output_topic = self.get_parameter("output_topic").value

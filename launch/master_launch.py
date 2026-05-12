@@ -121,6 +121,12 @@ def generate_launch_description():
                         ],
                         output='screen',
                     ),
+                    Node(
+                        package='leo_pid_demo',
+                        executable='lidar_cloud',
+                        name='lidar_cloud_node',
+                        output='screen',
+                    ),
                 ],
             )
 
@@ -141,7 +147,7 @@ def generate_launch_description():
             ],
         )
 
-        # ── 4. RViz (8s delay) ───────────────────────────────────
+        # ── 4. RViz — Navigation view (8s delay) ────────────────
         rviz_config = os.path.join(pkg_dir, 'waypoint_follower.rviz')
         rviz = TimerAction(
             period=8.0,
@@ -153,6 +159,23 @@ def generate_launch_description():
             ],
         )
 
+        # ── 5. RViz — LiDAR point cloud view (9s delay) ─────────
+        # Second RViz window showing just the overhead LiDAR
+        # point cloud. Only opens for non-empty worlds.
+        lidar_rviz = None
+        if chosen_world != 'empty':
+            lidar_rviz_config = os.path.join(pkg_dir, 'lidar_view.rviz')
+            lidar_rviz = TimerAction(
+                period=9.0,
+                actions=[
+                    ExecuteProcess(
+                        cmd=['rviz2', '-d', lidar_rviz_config,
+                         '--ros-args', '-r', '__node:=lidar_rviz'],
+                        output='screen',
+                    )
+                ],
+            )
+
         actions = [
             gazebo_launch,
             ground_truth_bridge,
@@ -161,6 +184,8 @@ def generate_launch_description():
         ]
         if lidar_bridge is not None:
             actions.append(lidar_bridge)
+        if lidar_rviz is not None:
+            actions.append(lidar_rviz)
         return actions
 
     # ── Assemble ─────────────────────────────────────────────────
