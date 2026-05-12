@@ -219,6 +219,66 @@ leo_pid_demo/
 
 **Point cloud not visible in LiDAR RViz:** Check the topic is publishing with `ros2 topic hz /overhead_lidar/points`. If no data, the LiDAR bridge may have failed. Ensure you launched with `world:=obstacles`. Also check the fixed frame is set to world
 
+
+## Docker (experimental)
+ 
+A Dockerfile is included for fully reproducible builds with GUI support (Gazebo, RViz, xterm). Anyone can clone the repo and run the simulation without installing ROS 2 or Gazebo — they only need Docker and GPU drivers.
+ 
+### Prerequisites
+ 
+- Docker installed — [install guide](https://docs.docker.com/engine/install/ubuntu/)
+- GPU drivers installed on host (for Gazebo 3D rendering)
+### Build the image
+ 
+```bash
+git clone https://github.com/i-singhal/leo_pid_demo.git
+cd leo_pid_demo
+docker build -t leo_pid_demo .
+```
+ 
+Building takes 5-10 minutes on first run (downloads ROS 2 Jazzy base image, installs Gazebo, Leo Rover packages, and builds the workspace). Subsequent builds are cached and much faster.
+ 
+### Run with GUI support (Linux)
+ 
+```bash
+# Allow Docker to access your display
+xhost +local:docker
+ 
+# Run the container
+docker run --net=host --rm -it --privileged \
+  --env DISPLAY=$DISPLAY \
+  -v /dev:/dev \
+  -v /tmp/.X11-unix:/tmp/.X11-unix \
+  leo_pid_demo
+ 
+# Inside the container:
+ros2 launch leo_pid_demo master_launch.py
+ros2 launch leo_pid_demo master_launch.py world:=obstacles
+```
+ 
+### What the run flags do
+ 
+- `--net=host` — shares the host network so ROS 2 DDS communication works
+- `--privileged` — gives full device access needed for GPU rendering
+- `-v /dev:/dev` — shares device files (GPU, input devices)
+- `-v /tmp/.X11-unix:/tmp/.X11-unix` — shares the X11 display socket
+- `--env DISPLAY=$DISPLAY` — tells GUI apps which display to use
+- `--rm` — auto-deletes the container when you exit
+- `-it` — interactive terminal
+### Verify GPU works inside container
+ 
+```bash
+# Inside the container:
+glxinfo | grep "OpenGL renderer"
+```
+ 
+If this shows your GPU name (not "llvmpipe"), GPU rendering is working.
+ 
+### Cleanup inside container
+ 
+The `killros` command is available inside the container for emergency process cleanup, same as on the host machine.
+
+
 ## Version History
 
 - **v1.0** — Original PID waypoint follower with odometry-based control
@@ -226,3 +286,4 @@ leo_pid_demo/
 - **v3.0** — Master launch script, kill-all cleanup, DDS localhost fix
 - **v3.1** — Fixed package.xml dependencies, dynamic ground truth topic
 - **v4.0** — Obstacle world, 3D overhead LiDAR, dual RViz windows, LiDAR bridge
+- **v4.1** — Docker support, comprehensive README
