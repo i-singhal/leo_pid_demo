@@ -217,7 +217,7 @@ leo_pid_demo/
 
 **Zombie processes after crash:** Run `killros` or `bash scripts/kill_all.sh` to force-kill everything and clean up DDS shared memory.
 
-**Point cloud not visible in LiDAR RViz:** Check the topic is publishing with `ros2 topic hz /overhead_lidar/points`. If no data, the LiDAR bridge may have failed. Ensure you launched with `world:=obstacles`.
+**Point cloud not visible in LiDAR RViz:** Check the topic is publishing with `ros2 topic hz /overhead_lidar/points`. If no data, the LiDAR bridge may have failed. Ensure you launched with `world:=obstacles`. Also check the fixed frame is set to world
 
 ## Version History
 
