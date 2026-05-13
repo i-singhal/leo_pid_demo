@@ -64,8 +64,8 @@ A simulated 3D LiDAR mounted at 12m height (simulating a stationary drone), poin
 - 5Hz update rate
 - Bridged from Gazebo's PointCloudPacked to ROS 2's PointCloud2 via ros_gz_bridge
 
-# Setup - Machine
-## Prerequisites
+## Setup - Machine
+### Prerequisites
 
 - **Ubuntu 24.04**
 - **ROS 2 Jazzy** — [install guide](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html)
@@ -109,7 +109,7 @@ colcon build
 source install/setup.bash
 ```
 
-## Recommended: set ROS 2 to localhost only
+### Recommended: set ROS 2 to localhost only
 
 Since everything runs on one machine, restrict ROS 2 communication to localhost. This prevents DDS multicast issues on Wi-Fi:
 
@@ -177,7 +177,7 @@ If this shows your GPU name (not "llvmpipe"), GPU rendering is working.
 The `killros` command is available inside the container for emergency process cleanup, same as on the host machine.
 
 
-## Usage - similar in both the setups
+## Usage - similar in both machine and docker
 
 ### Launch with empty world (default)
 
